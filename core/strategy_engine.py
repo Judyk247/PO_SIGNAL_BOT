@@ -26,7 +26,7 @@ class StrategyEngine:
     
     def process_data(self, processed_data):
         """
-        Process data and generate trading signals
+        Process data and generate trading signals for PocketOption
         Returns: Signal dict or None
         """
         try:
@@ -38,8 +38,8 @@ class StrategyEngine:
             if data_type == 'tick':
                 return self._process_tick_signal(processed_data)
                 
-            elif data_type == 'instrument_update':
-                return self._process_ohlc_signal(processed_data)
+            elif data_type == 'candles':  # Changed from 'instrument_update' to 'candles'
+                return self._process_candles_signal(processed_data)  # Renamed method
                 
             return None
             
@@ -48,67 +48,113 @@ class StrategyEngine:
             return None
     
     def _process_tick_signal(self, tick_data):
-        """Process tick data for signals"""
+        """Process tick data for signals - more useful for PocketOption"""
         asset = tick_data.get('asset', '')
         price = tick_data.get('price', 0)
+        bid = tick_data.get('bid', 0)
+        ask = tick_data.get('ask', 0)
         
-        logger.debug(f"Processing tick: {asset} = {price}")
+        logger.debug(f"Processing tick: {asset} | Price: {price} | Bid/Ask: {bid}/{ask}")
         
-        # For tick data, we might want to use different strategies
-        # For now, return None as ticks are less reliable for our strategies
+        # For PocketOption, tick data can be more relevant for certain strategies
+        # You might want to implement tick-based strategies here
+        # For now, return None as we focus on candle-based strategies
         return None
     
-    def _process_ohlc_signal(self, ohlc_data):
-        """Process OHLC data for signals using our strategies"""
-        asset = ohlc_data.get('asset', '')
-        candles = ohlc_data.get('candles', [])
-        timeframe = ohlc_data.get('period', '5m')
+    def _process_candles_signal(self, candles_data):  # Renamed from _process_ohlc_signal
+        """Process candles data for signals using our strategies"""
+        asset = candles_data.get('asset', '')
+        candles = candles_data.get('candles', [])
+        timeframe = candles_data.get('timeframe', '5m')  # Changed from 'period' to 'timeframe'
         
-        logger.debug(f"Processing OHLC: {asset} with {len(candles)} candles (TF: {timeframe})")
+        logger.debug(f"Processing candles: {asset} with {len(candles)} candles (TF: {timeframe})")
         
         # Convert candles to DataFrame for our strategies
         if candles and len(candles) > 0:
             df = self._candles_to_dataframe(candles)
             
+            if df.empty:
+                return None
+            
             # Run appropriate strategy based on timeframe
-            if timeframe == 300 or timeframe == '5m':  # 5 minutes
-                signal = self.strategies['trend_reversal_5m'].analyze(df)
-            elif timeframe == 60 or timeframe == '1m':  # 1 minute
-                signal = self.strategies['trend_following_1m'].analyze(df)
-            elif timeframe == 120 or timeframe == '2m':  # 2 minutes
-                signal = self.strategies['trend_following_2m'].analyze(df)
-            elif timeframe == 180 or timeframe == '3m':  # 3 minutes
-                signal = self.strategies['trend_following_3m'].analyze(df)
-            else:
-                signal = {'signal': 'hold', 'confidence': 0}
+            signal = self._run_strategy_for_timeframe(df, timeframe)
             
             # Add asset and timeframe to signal
-            if signal and signal['signal'] != 'hold':
+            if signal and signal.get('signal') != 'hold':
                 signal['asset'] = asset
-                signal['timeframe'] = self._seconds_to_timeframe(timeframe)
+                signal['timeframe'] = timeframe
+                signal['timestamp'] = pd.Timestamp.now()  # Add current timestamp
                 self._store_signal(signal)
+                
+                logger.info(f"📈 Signal generated: {signal['signal'].upper()} for {asset} ({timeframe}) "
+                           f"| Confidence: {signal.get('confidence', 0)}%")
                 return signal
         
         return None
     
+    def _run_strategy_for_timeframe(self, df, timeframe):
+        """Run the appropriate strategy based on timeframe"""
+        strategy_key = None
+        
+        if timeframe == '5m':
+            strategy_key = 'trend_reversal_5m'
+        elif timeframe == '1m':
+            strategy_key = 'trend_following_1m'
+        elif timeframe == '2m':
+            strategy_key = 'trend_following_2m'
+        elif timeframe == '3m':
+            strategy_key = 'trend_following_3m'
+        
+        if strategy_key and strategy_key in self.strategies:
+            try:
+                return self.strategies[strategy_key].analyze(df)
+            except Exception as e:
+                logger.error(f"Error running strategy {strategy_key}: {e}")
+        
+        return {'signal': 'hold', 'confidence': 0}
+    
     def _candles_to_dataframe(self, candles):
-        """Convert candles list to pandas DataFrame"""
+        """Convert PocketOption candles list to pandas DataFrame"""
         if not candles:
             return pd.DataFrame()
             
-        # Assuming candles format: [timestamp, open, high, low, close, volume]
-        df = pd.DataFrame(candles, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
-        df['timestamp'] = pd.to_datetime(df['timestamp'], unit='s')
-        df.set_index('timestamp', inplace=True)
-        return df
-    
-    def _seconds_to_timeframe(self, seconds):
-        """Convert seconds to timeframe string"""
-        if seconds == 60: return '1m'
-        if seconds == 120: return '2m'
-        if seconds == 180: return '3m'
-        if seconds == 300: return '5m'
-        return f"{seconds}s"
+        try:
+            # PocketOption candle format might be: [timestamp, open, high, low, close, volume]
+            # OR could be objects with keys - we need to handle both
+            if isinstance(candles[0], (list, tuple)):
+                # List format: [timestamp, open, high, low, close, volume]
+                df = pd.DataFrame(candles, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+                df['timestamp'] = pd.to_datetime(df['timestamp'], unit='s')  # Assuming Unix timestamp
+                
+            elif isinstance(candles[0], dict):
+                # Dictionary format: {ts, open, high, low, close, volume}
+                df = pd.DataFrame(candles)
+                if 'ts' in df.columns:  # PocketOption uses 'ts' for timestamp
+                    df['timestamp'] = pd.to_datetime(df['ts'], unit='s')
+                elif 'timestamp' in df.columns:
+                    df['timestamp'] = pd.to_datetime(df['timestamp'], unit='s')
+                else:
+                    # Create a timestamp index if no timestamp provided
+                    df['timestamp'] = pd.date_range(start=pd.Timestamp.now() - pd.Timedelta(minutes=len(df)), 
+                                                   periods=len(df), freq='T')
+            
+            else:
+                logger.warning(f"Unknown candle format: {type(candles[0])}")
+                return pd.DataFrame()
+            
+            df.set_index('timestamp', inplace=True)
+            
+            # Ensure numeric columns
+            numeric_cols = ['open', 'high', 'low', 'close', 'volume']
+            for col in numeric_cols:
+                if col in df.columns:
+                    df[col] = pd.to_numeric(df[col], errors='coerce')
+            
+            return df
+            
+        except Exception as e:
+            logger.error(f"Error converting candles to DataFrame: {e}")
+            return pd.DataFrame()
     
     def _store_signal(self, signal):
         """Store signal in history"""
@@ -123,3 +169,7 @@ class StrategyEngine:
     def get_signals_by_asset(self, asset):
         """Get signals for a specific asset"""
         return [s for s in self.signals if s.get('asset') == asset]
+    
+    def clear_signals(self):
+        """Clear all signals history"""
+        self.signals = []
