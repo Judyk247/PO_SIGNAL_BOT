@@ -1,7 +1,7 @@
 /* dashboard/static/css/dashboard.css */
 :root {
-    --primary-color: #2c3e50;
-    --secondary-color: #34495e;
+    --primary-color: #4a6baf;  /* PocketOption blue */
+    --secondary-color: #3a5a9f;
     --success-color: #27ae60;
     --danger-color: #e74c3c;
     --warning-color: #f39c12;
@@ -22,7 +22,7 @@
 
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #4a6baf 0%, #2c3e50 100%); /* PocketOption colors */
     min-height: 100vh;
     color: var(--text-color);
 }
@@ -56,31 +56,8 @@ body {
     opacity: 0.8;
 }
 
-.status-card {
-    background: rgba(255, 255, 255, 0.95);
-    padding: 1.5rem;
-    border-radius: 15px;
-    margin-bottom: 2rem;
-    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
-}
-
-.status-card h2 {
-    margin-bottom: 1rem;
-    color: var(--primary-color);
-}
-
-.status-online {
-    color: var(--success-color);
-    font-weight: bold;
-    animation: pulse 2s infinite;
-}
-
-.status-offline {
-    color: var(--danger-color);
-    font-weight: bold;
-}
-
-.stats-grid {
+/* Connection Status Grid - Matches your HTML structure */
+.connection-status {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
     gap: 1.5rem;
@@ -97,47 +74,51 @@ body {
 }
 
 .stat-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+    transform: translateY(-3px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
 }
 
 .stat-card h3 {
     color: var(--secondary-color);
     font-size: 0.9rem;
-    margin-bottom: 0.5rem;
+    margin-bottom: 1rem;
     text-transform: uppercase;
     letter-spacing: 1px;
 }
 
 .stat-card .value {
-    font-size: 2rem;
+    font-size: 1.8rem;
     font-weight: bold;
     margin: 0.5rem 0;
+}
+
+/* Connection status specific styles */
+.connected { 
+    color: var(--success-color);
+    font-weight: bold;
+}
+
+.disconnected { 
+    color: var(--danger-color);
+    font-weight: bold;
+}
+
+.authenticated { color: var(--success-color); }
+.not-authenticated { color: var(--warning-color); }
+
+/* Stats Grid */
+.stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
 }
 
 .profit { color: var(--success-color); }
 .loss { color: var(--danger-color); }
 .warning { color: var(--warning-color); }
 
-.charts-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
-    gap: 1.5rem;
-    margin-bottom: 2rem;
-}
-
-.chart-container {
-    background: rgba(255, 255, 255, 0.95);
-    padding: 1.5rem;
-    border-radius: 15px;
-    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
-}
-
-.chart-container h3 {
-    margin-bottom: 1rem;
-    color: var(--primary-color);
-}
-
+/* Signals Container */
 .signals-container {
     background: rgba(255, 255, 255, 0.95);
     padding: 1.5rem;
@@ -162,7 +143,7 @@ body {
 }
 
 .signal:hover {
-    background-color: rgba(52, 152, 219, 0.1);
+    background-color: rgba(74, 107, 175, 0.05); /* PocketOption blue tint */
 }
 
 .signal-header {
@@ -173,13 +154,35 @@ body {
     backdrop-filter: blur(10px);
 }
 
-.buy { color: var(--success-color); font-weight: bold; }
-.sell { color: var(--danger-color); font-weight: bold; }
+/* PocketOption signal directions */
+.call { 
+    background-color: #d4edda;
+    color: var(--success-color);
+    font-weight: bold;
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+
+.put { 
+    background-color: #f8d7da;
+    color: var(--danger-color);
+    font-weight: bold;
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+
+.hold { 
+    background-color: #fff3cd;
+    color: var(--warning-color);
+    font-weight: bold;
+    padding: 4px 8px;
+    border-radius: 4px;
+}
 
 .confidence-bar {
-    height: 25px;
+    height: 20px;
     background: var(--light-color);
-    border-radius: 12px;
+    border-radius: 10px;
     overflow: hidden;
     position: relative;
 }
@@ -187,7 +190,7 @@ body {
 .confidence-fill {
     height: 100%;
     background: linear-gradient(90deg, var(--danger-color), var(--warning-color), var(--success-color));
-    border-radius: 12px;
+    border-radius: 10px;
     transition: width 0.5s ease;
 }
 
@@ -199,10 +202,22 @@ body {
     text-align: center;
     color: white;
     font-weight: bold;
-    font-size: 0.8rem;
-    line-height: 25px;
+    font-size: 0.7rem;
+    line-height: 20px;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
+
+/* Status indicators */
+.status-indicator {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 8px;
+}
+
+.status-online { background-color: var(--success-color); }
+.status-offline { background-color: var(--danger-color); }
 
 /* Animations */
 @keyframes pulse {
@@ -226,6 +241,10 @@ body {
     animation: slideIn 0.5s ease;
 }
 
+.connected {
+    animation: pulse 2s infinite;
+}
+
 /* Responsive Design */
 @media (max-width: 1200px) {
     .charts-grid {
@@ -244,7 +263,8 @@ body {
         text-align: center;
     }
     
-    .stats-grid {
+    .connection-status,
+    .stats {
         grid-template-columns: 1fr;
     }
     
@@ -270,11 +290,12 @@ body {
     right: 20px;
     background: var(--success-color);
     color: white;
-    padding: 10px 20px;
+    padding: 12px 24px;
     border-radius: 25px;
     box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
     animation: slideIn 0.3s ease;
     z-index: 1000;
+    font-weight: bold;
 }
 
 /* Scrollbar styling */
@@ -295,3 +316,30 @@ body {
 ::-webkit-scrollbar-thumb:hover {
     background: rgba(255, 255, 255, 0.5);
 }
+
+/* Small text for additional info */
+small {
+    color: var(--secondary-color);
+    opacity: 0.7;
+    font-size: 0.8rem;
+}
+
+/* Active assets counter */
+#active-assets {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: var(--primary-color);
+}
+
+/* Message count styling */
+#message-count {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: var(--info-color);
+}
+
+/* Last activity timestamp */
+#last-activity {
+    font-size: 0.9rem;
+    color: var(--secondary-color);
+    }
