@@ -3,58 +3,92 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Quotex Trading Bot Dashboard</title>
+    <title>PocketOption Trading Bot Dashboard</title>
     <script src="https://cdn.socket.io/4.5.0/socket.io.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
 </head>
 <body>
     <div class="container">
+        <!-- Header Section -->
         <div class="header">
-            <h1>Quotex Trading Bot Dashboard</h1>
-            <p>Real-time trading signals and performance monitoring</p>
+            <div class="logo-section">
+                <div class="app-logo">
+                    <div class="logo-emoji">🚀</div>
+                    <div class="logo-text">PocketOption Bot</div>
+                </div>
+                <div class="status-badge" id="live-status">Live Trading</div>
+            </div>
+            <h2>📊 Real-time Dashboard</h2>
+            <p>Monitor your automated trading signals and connection status</p>
         </div>
 
-        <div class="status-card">
-            <h2>System Status: <span id="status" class="status-online">Online</span></h2>
-            <p>Connected Clients: <span id="clients">0</span></p>
-            <p>Last Update: <span id="last-update">-</span></p>
-            <button id="refresh-btn" style="margin-top: 10px; padding: 8px 16px; background: #3498db; color: white; border: none; border-radius: 5px; cursor: pointer;">
-                Refresh Data
-            </button>
+        <!-- Connection Status Grid -->
+        <div class="connection-status">
+            <div class="stat-card">
+                <h3>🔌 Connection Status</h3>
+                <div class="value">
+                    <span id="connection-status" class="disconnected">Disconnected</span>
+                </div>
+                <small>WebSocket connection to PocketOption</small>
+            </div>
+            <div class="stat-card">
+                <h3>🔐 Authentication</h3>
+                <div class="value">
+                    <span id="authentication-status" class="not-authenticated">Not Authenticated</span>
+                </div>
+                <small>PocketOption login status</small>
+            </div>
+            <div class="stat-card">
+                <h3>📨 Message Count</h3>
+                <div class="value" id="message-count">0</div>
+                <small>WebSocket messages received</small>
+            </div>
+            <div class="stat-card">
+                <h3>⚡ Last Activity</h3>
+                <div class="value" id="last-activity">Never</div>
+                <small>Last message timestamp</small>
+            </div>
         </div>
 
-        <div class="stats-grid">
+        <!-- Performance Stats Grid -->
+        <div class="stats">
             <div class="stat-card">
                 <h3>Total Signals</h3>
                 <div class="value" id="total-signals">0</div>
-                <p>All generated signals</p>
+                <small>All generated signals</small>
             </div>
             <div class="stat-card">
                 <h3>Winning Signals</h3>
                 <div class="value profit" id="winning-signals">0</div>
-                <p>Successful trades</p>
+                <small>Successful trades</small>
             </div>
             <div class="stat-card">
                 <h3>Losing Signals</h3>
                 <div class="value loss" id="losing-signals">0</div>
-                <p>Unsuccessful trades</p>
+                <small>Unsuccessful trades</small>
             </div>
             <div class="stat-card">
                 <h3>Total Profit</h3>
                 <div class="value profit" id="total-profit">$0.00</div>
-                <p>Overall profit/loss</p>
+                <small>Overall profit/loss</small>
             </div>
             <div class="stat-card">
                 <h3>Win Rate</h3>
                 <div class="value" id="win-rate">0%</div>
-                <p>Success percentage</p>
+                <small>Success percentage</small>
+            </div>
+            <div class="stat-card">
+                <h3>🎯 Active Assets</h3>
+                <div class="value" id="active-assets">0</div>
+                <small>Assets with signals</small>
             </div>
         </div>
 
+        <!-- Charts Section -->
         <div class="charts-grid">
             <div class="chart-container">
-                <h3>Performance Chart</h3>
+                <h3>Performance Trend</h3>
                 <canvas id="performance-chart" width="400" height="300"></canvas>
             </div>
             <div class="chart-container">
@@ -63,22 +97,30 @@
             </div>
         </div>
 
+        <!-- Trading Signals Section -->
         <div class="signals-container">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                <h2>Recent Trading Signals</h2>
+                <h2>📈 Recent Trading Signals</h2>
                 <div style="display: flex; gap: 1rem;">
-                    <input type="text" id="search-signals" placeholder="Search signals..." style="padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                    <input type="text" id="search-signals" placeholder="Search assets or signals..." 
+                           style="padding: 8px; border: 1px solid #ddd; border-radius: 5px; width: 200px;">
                     <select id="filter-asset" style="padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
                         <option value="all">All Assets</option>
+                        <!-- Assets will be populated dynamically from PocketOption -->
                         <option value="EURUSD">EURUSD</option>
                         <option value="GBPUSD">GBPUSD</option>
                         <option value="USDJPY">USDJPY</option>
-                        <option value="BTCUSD">BTCUSD</option>
-                        <!-- Add more assets as needed -->
+                        <option value="BTC">BTC</option>
+                        <option value="ETH">ETH</option>
+                        <option value="US500">US500</option>
                     </select>
+                    <button id="refresh-btn" style="padding: 8px 16px; background: #4a6baf; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                        🔄 Refresh
+                    </button>
                 </div>
             </div>
             
+            <!-- Signals Header -->
             <div class="signal signal-header">
                 <div>Time</div>
                 <div>Asset</div>
@@ -86,12 +128,64 @@
                 <div>Timeframe</div>
                 <div>Confidence</div>
             </div>
+            
+            <!-- Signals Container -->
             <div id="signals-container">
-                <!-- Signals will be added here dynamically -->
+                <!-- Signals will be added here dynamically via JavaScript -->
+                <div class="signal" style="text-align: center; padding: 2rem; color: #666; font-style: italic;">
+                    Waiting for trading signals... Signals will appear here in real-time
+                </div>
             </div>
+        </div>
+
+        <!-- System Info Footer -->
+        <div style="text-align: center; margin-top: 2rem; padding: 1rem; color: #666; font-size: 0.9rem;">
+            <p>PocketOption Trading Bot • Real-time Monitoring • 
+               <span id="last-update">Last update: Never</span>
+            </p>
         </div>
     </div>
 
     <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+    
+    <!-- Initialize Dashboard -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize the PocketOption dashboard
+            if (typeof PocketOptionDashboard !== 'undefined') {
+                window.pocketOptionDashboard = new PocketOptionDashboard();
+            } else {
+                console.error('PocketOptionDashboard class not found. Make sure dashboard.js is loaded correctly.');
+                
+                // Fallback: Basic Socket.io connection
+                const socket = io();
+                socket.on('connect', function() {
+                    console.log('Connected to server');
+                    document.getElementById('connection-status').textContent = '✅ Connected';
+                    document.getElementById('connection-status').className = 'connected';
+                });
+                
+                socket.on('new_signal', function(signal) {
+                    console.log('New signal received:', signal);
+                    // Basic signal display fallback
+                    const container = document.getElementById('signals-container');
+                    if (container) {
+                        const signalElement = document.createElement('div');
+                        signalElement.className = 'signal';
+                        signalElement.innerHTML = `
+                            <div>${new Date().toLocaleTimeString()}</div>
+                            <div>${signal.asset || 'Unknown'}</div>
+                            <div class="${signal.direction ? signal.direction.toLowerCase() : 'hold'}">
+                                ${signal.direction || 'HOLD'}
+                            </div>
+                            <div>${signal.timeframe || ''}</div>
+                            <div>${signal.confidence || 0}%</div>
+                        `;
+                        container.insertBefore(signalElement, container.firstChild);
+                    }
+                });
+            }
+        });
+    </script>
 </body>
-                </html>
+                        </html>
