@@ -19,7 +19,15 @@ class Dashboard:
             'total_signals': 0,
             'winning_signals': 0,
             'losing_signals': 0,
-            'total_profit': 0
+            'total_profit': 0,
+            'active_assets': set(),
+            'connection_status': 'disconnected'
+        }
+        self.connection_stats = {
+            'websocket_connected': False,
+            'authenticated': False,
+            'last_message': None,
+            'message_count': 0
         }
     
     def add_signal(self, signal):
@@ -34,11 +42,23 @@ class Dashboard:
         }
         
         self.signals.insert(0, formatted_signal)
-        self.signals = self.signals[:20]
+        self.signals = self.signals[:20]  # Keep only recent 20 signals
+        
+        # Track active assets
+        if formatted_signal['asset'] != 'Unknown':
+            self.performance['active_assets'].add(formatted_signal['asset'])
         
         self.performance['total_signals'] += 1
         
         socketio.emit('new_signal', formatted_signal)
+        socketio.emit('performance_update', self.performance)
+    
+    def update_connection_status(self, status_data):
+        """Update WebSocket connection status"""
+        self.connection_stats.update(status_data)
+        self.performance['connection_status'] = 'connected' if status_data.get('websocket_connected') else 'disconnected'
+        
+        socketio.emit('connection_update', self.connection_stats)
         socketio.emit('performance_update', self.performance)
 
 # Global dashboard instance
@@ -75,23 +95,52 @@ def create_fallback_dashboard():
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Quotex Trading Bot Dashboard</title>
+        <title>PocketOption Trading Bot Dashboard</title>
         <script src="https://cdn.socket.io/4.5.0/socket.io.min.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
         <style>
             body { font-family: Arial, sans-serif; margin: 20px; background: #f4f4f4; }
-            .header { background: #2c3e50; color: white; padding: 20px; border-radius: 5px; }
+            .header { background: #4a6baf; color: white; padding: 20px; border-radius: 5px; }
             .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin: 20px 0; }
             .stat-card { background: white; padding: 20px; border-radius: 5px; text-align: center; }
+            .connection-status { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin: 20px 0; }
             .signal { padding: 10px; border-bottom: 1px solid #eee; display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1fr; }
             .profit { color: green; font-weight: bold; }
             .loss { color: red; font-weight: bold; }
+            .connected { color: green; }
+            .disconnected { color: red; }
+            .call { background-color: #d4edda; }
+            .put { background-color: #f8d7da; }
+            .hold { background-color: #fff3cd; }
         </style>
     </head>
     <body>
         <div class="header">
-            <h1>Quotex Trading Bot Dashboard</h1>
-            <p>Real-time trading signals</p>
+            <h1>📊 PocketOption Trading Bot Dashboard</h1>
+            <p>Real-time trading signals and connection monitoring</p>
+        </div>
+        
+        <div class="connection-status">
+            <div class="stat-card">
+                <h3>🔌 Connection Status</h3>
+                <div id="connection-status" class="disconnected">Disconnected</div>
+                <div id="authentication-status">Not Authenticated</div>
+            </div>
+            <div class="stat-card">
+                <h3>📨 Message Count</h3>
+                <div id="message-count">0</div>
+                <small>WebSocket messages received</small>
+            </div>
+            <div class="stat-card">
+                <h3>⚡ Last Activity</h3>
+                <div id="last-activity">Never</div>
+                <small>Last message timestamp</small>
+            </div>
+            <div class="stat-card">
+                <h3>🎯 Active Assets</h3>
+                <div id="active-assets">0</div>
+                <small>Assets with signals</small>
+            </div>
         </div>
         
         <div class="stats">
@@ -103,7 +152,7 @@ def create_fallback_dashboard():
         </div>
         
         <div style="background: white; padding: 20px; border-radius: 5px;">
-            <h2>Recent Trading Signals</h2>
+            <h2>📈 Recent Trading Signals</h2>
             <div class="signal" style="font-weight: bold; background: #f8f9fa;">
                 <div>Time</div><div>Asset</div><div>Signal</div><div>Timeframe</div><div>Confidence</div>
             </div>
@@ -112,30 +161,56 @@ def create_fallback_dashboard():
         
         <script>
             const socket = io();
+            
+            // Handle connection status updates
+            socket.on('connection_update', function(stats) {
+                document.getElementById('connection-status').textContent = 
+                    stats.websocket_connected ? '✅ Connected' : '❌ Disconnected';
+                document.getElementById('connection-status').className = 
+                    stats.websocket_connected ? 'connected' : 'disconnected';
+                
+                document.getElementById('authentication-status').textContent = 
+                    stats.authenticated ? '✅ Authenticated' : '❌ Not Authenticated';
+                document.getElementById('message-count').textContent = stats.message_count;
+                document.getElementById('last-activity').textContent = 
+                    stats.last_message || 'Never';
+            });
+            
+            // Handle new trading signals
             socket.on('new_signal', function(signal) {
                 const container = document.getElementById('signals-container');
                 const signalElement = document.createElement('div');
-                signalElement.className = 'signal';
+                signalElement.className = 'signal ' + signal.direction.toLowerCase();
                 signalElement.innerHTML = `
-                    <div>${signal.timestamp}</div>
+                    <div>${new Date(signal.timestamp).toLocaleTimeString()}</div>
                     <div>${signal.asset}</div>
                     <div class="${signal.direction.toLowerCase()}">${signal.direction}</div>
                     <div>${signal.timeframe}</div>
                     <div>${signal.confidence}%</div>
                 `;
                 container.insertBefore(signalElement, container.firstChild);
+                
+                // Limit to 20 signals
+                if (container.children.length > 20) {
+                    container.removeChild(container.lastChild);
+                }
             });
             
+            // Handle performance updates
             socket.on('performance_update', function(data) {
                 document.getElementById('total-signals').textContent = data.total_signals;
                 document.getElementById('winning-signals').textContent = data.winning_signals;
                 document.getElementById('losing-signals').textContent = data.losing_signals;
                 document.getElementById('total-profit').textContent = '$' + data.total_profit.toFixed(2);
+                document.getElementById('active-assets').textContent = data.active_assets ? data.active_assets.size : 0;
                 
                 const winRate = data.total_signals > 0 ? 
                     ((data.winning_signals / data.total_signals) * 100).toFixed(1) : 0;
                 document.getElementById('win-rate').textContent = winRate + '%';
             });
+            
+            // Request initial data
+            socket.emit('get_initial_data');
         </script>
     </body>
     </html>
@@ -182,7 +257,11 @@ def debug_files():
 
 @app.route('/health')
 def health_check():
-    return jsonify({'status': 'healthy'})
+    return jsonify({
+        'status': 'healthy', 
+        'service': 'PocketOption Trading Bot',
+        'signals_count': len(dashboard.signals)
+    })
 
 @app.route('/api/signals')
 def get_signals():
@@ -192,14 +271,25 @@ def get_signals():
 def get_performance():
     return jsonify(dashboard.performance)
 
+@app.route('/api/connection')
+def get_connection_status():
+    return jsonify(dashboard.connection_stats)
+
 @socketio.on('connect')
 def handle_connect():
     socketio.emit('clients_update', len(socketio.server.manager.rooms))
+    # Send current connection status to newly connected client
+    socketio.emit('connection_update', dashboard.connection_stats)
 
 @socketio.on('disconnect')
 def handle_disconnect():
     socketio.emit('clients_update', len(socketio.server.manager.rooms))
 
-@socketio.on('clients_update')
-def handle_clients_update():
-    socketio.emit('clients_update', len(socketio.server.manager.rooms))
+@socketio.on('get_initial_data')
+def handle_initial_data():
+    """Send all current data to newly connected client"""
+    socketio.emit('connection_update', dashboard.connection_stats)
+    socketio.emit('performance_update', dashboard.performance)
+    # Send recent signals
+    for signal in dashboard.signals[:10]:
+        socketio.emit('new_signal', signal)
